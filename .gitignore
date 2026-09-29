@@ -9,7 +9,7 @@ Thumbs.db
 *.cache
 .idea/
 .vscode/
-panel/cai.txt
+.cai*
 *.txt
 composer.lock
 storage/locks
