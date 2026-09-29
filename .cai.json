@@ -1,0 +1,36 @@
+{
+  "name": "reactor",
+  "description": "",
+  "maxSizeMB": 50,
+  "ignore": [
+    ".git",
+    "vendor",
+    "node_modules",
+    "dist",
+    "build",
+    "storage",
+    ".env",
+    "cai.json",
+    "go.mod",
+    "go.sum",
+    ".cai"
+  ],
+  "include": [
+    "*",
+    ".gitignore",
+    "README.md",
+    "LICENSE",
+    "Makefile",
+    "Dockerfile"
+  ],
+  "useGitignore": false,
+  "tree": true,
+  "files": true,
+  "chunkSize": 0,
+  "tokenBudget": 0,
+  "outputMode": "file",
+  "compressEmpty": true,
+  "orderBy": "size",
+  "diffMode": false,
+  "showStats": true
+}
