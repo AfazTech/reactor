@@ -11,6 +11,6 @@
     "minimum-stability": "stable",
     "prefer-stable": true,
     "require": {
-        "afaztech/reactor-framework": "^0.1.0"
+        "afaztech/reactor-framework": "^0.4.0"
     }
 }
