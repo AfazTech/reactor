@@ -160,7 +160,7 @@ This creates the `users`, `jobs`, and `posts` tables.
 ### 4. Start the bot
 
 ```bash
-php bot.php
+php reactor.php start
 ```
 
 You should see output like:
@@ -280,7 +280,6 @@ MySQL and other drivers are supported through `illuminate/database`. Just add a 
 │   └── webhook.php                           # Webhook entry point
 ├── .env.example
 ├── .gitignore
-├── bot.php                                   # Polling entry point
 ├── composer.json
 ├── LICENSE
 ├── README.md
@@ -1226,7 +1225,7 @@ After=network.target
 Type=simple
 User=www-data
 WorkingDirectory=/var/www/my-bot
-ExecStart=/usr/bin/php /var/www/my-bot/bot.php
+ExecStart=/usr/bin/php /var/www/my-bot/reactor.php start
 Restart=always
 RestartSec=5
 StandardOutput=append:/var/log/my-bot.log
