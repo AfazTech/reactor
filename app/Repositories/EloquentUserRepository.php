@@ -4,6 +4,7 @@ namespace App\Repositories;
 
 use App\Models\User;
 use App\Contracts\Repository\UserRepositoryInterface;
+use Carbon\Carbon;
 use Reactor\Contracts\LanguageInterface;
 use Reactor\Contracts\UserProviderInterface;
 
@@ -15,6 +16,10 @@ use Reactor\Contracts\UserProviderInterface;
  *
  * The `temp` column is cast to array on the model level, so no manual
  * json_encode/json_decode is required here.
+ *
+ * Timestamps use Carbon directly rather than Laravel's global now()
+ * helper, because the skeleton bootstraps Eloquent via Capsule without
+ * loading Laravel's helper functions.
  */
 class EloquentUserRepository implements UserRepositoryInterface, UserProviderInterface
 {
@@ -112,7 +117,7 @@ class EloquentUserRepository implements UserRepositoryInterface, UserProviderInt
     {
         User::updateOrCreate(
             ['user_id' => $userId],
-            ['last_interaction_at' => now()]
+            ['last_interaction_at' => Carbon::now()]
         );
     }
 }
