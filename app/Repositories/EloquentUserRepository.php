@@ -107,4 +107,12 @@ class EloquentUserRepository implements UserRepositoryInterface, UserProviderInt
             ['status' => $status]
         );
     }
+
+    public function setLastInteraction(int $userId): void
+    {
+        User::updateOrCreate(
+            ['user_id' => $userId],
+            ['last_interaction_at' => now()]
+        );
+    }
 }

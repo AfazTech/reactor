@@ -7,7 +7,7 @@ namespace App\Contracts\Repository;
  *
  * Defines the contract for managing user data, including retrieval,
  * synchronization, language preference, step management, activity
- * status, and temporary data.
+ * status, last interaction timestamp, and temporary data.
  */
 interface UserRepositoryInterface
 {
@@ -94,4 +94,11 @@ interface UserRepositoryInterface
      * @param int $status 1 when the user is active, 0 when blocked or inactive.
      */
     public function setStatus(int $userId, int $status): void;
+
+    /**
+     * Record the current time as the user's last interaction moment.
+     *
+     * @param int $userId Telegram user ID.
+     */
+    public function setLastInteraction(int $userId): void;
 }

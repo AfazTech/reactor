@@ -18,10 +18,12 @@ use Reactor\Events;
  * that handler code and middleware agree on how a user is located
  * inside every supported update type.
  *
- * Also maintains the user's `status` flag:
- *   - Any incoming interaction sets status = 1 (active).
+ * Also maintains the user's activity metadata:
+ *   - Any incoming interaction sets status = 1 (active) and refreshes
+ *     last_interaction_at.
  *   - A block event (my_chat_member in a private chat with 'kicked'
- *     status) sets status = 0.
+ *     status) sets status = 0 but still refreshes last_interaction_at,
+ *     because blocking is itself an interaction.
  */
 #[Middleware(priority: 50, mode: MiddlewareMode::GLOBAL)]
 #[OnUpdate('any')]
@@ -73,6 +75,7 @@ class SyncUserMiddleware implements MiddlewareInterface
 
         // Any incoming interaction counts as the user being active.
         $this->userRepository->setStatus($userId, 1);
+        $this->userRepository->setLastInteraction($userId);
 
         if ($isNew) {
             $this->dispatcher->dispatch(Events::USER_REGISTERED, $userId, $update);
@@ -86,6 +89,9 @@ class SyncUserMiddleware implements MiddlewareInterface
      * Set the user's status based on the bot's membership state inside
      * their private chat. Telegram delivers 'kicked' when the user
      * blocks the bot and 'member' when they unblock it.
+     *
+     * Both transitions are interactions, so last_interaction_at is
+     * refreshed in either case.
      */
     private function handlePrivateChatMemberUpdate(array $myChatMember): void
     {
@@ -99,12 +105,14 @@ class SyncUserMiddleware implements MiddlewareInterface
 
         if ($newStatus === 'kicked') {
             $this->userRepository->setStatus($userId, 0);
+            $this->userRepository->setLastInteraction($userId);
             $this->logger->debug('User blocked the bot', ['user_id' => $userId]);
             return;
         }
 
         if ($newStatus !== null) {
             $this->userRepository->setStatus($userId, 1);
+            $this->userRepository->setLastInteraction($userId);
             $this->logger->debug('User unblocked the bot', ['user_id' => $userId]);
         }
     }

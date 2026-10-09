@@ -29,6 +29,9 @@ class CreateUsersTable extends Migration
                 // has not chosen a language yet. StartHandler detects this
                 // and shows the language selection screen.
                 $table->string('language', 10)->nullable();
+                // Timestamp of the most recent interaction with the bot
+                // (message, callback, block/unblock event, ...).
+                $table->dateTime('last_interaction_at')->nullable();
                 $table->timestamps();
             });
         }
