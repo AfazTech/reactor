@@ -8,8 +8,11 @@ use Illuminate\Database\Eloquent\Model;
  * Eloquent model for the `users` table.
  *
  * Stores Telegram user information, including language preference,
- * current step, and temporary data. The `temp` column is stored as
- * JSON and automatically cast to/from an array by Eloquent.
+ * current step, activity status, and temporary data. The `temp` column
+ * is stored as JSON and automatically cast to/from an array by
+ * Eloquent. The `status` column is a boolean activity flag: true when
+ * the user is active, false when they have blocked the bot or are
+ * otherwise inactive.
  */
 class User extends Model
 {
@@ -26,7 +29,7 @@ class User extends Model
      * @var array
      */
     protected $fillable = [
-        'user_id', 'username', 'first_name', 'last_name', 'language', 'step', 'temp',
+        'user_id', 'username', 'first_name', 'last_name', 'status', 'language', 'step', 'temp',
     ];
 
     /**

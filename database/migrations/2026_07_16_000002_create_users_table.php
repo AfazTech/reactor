@@ -21,13 +21,14 @@ class CreateUsersTable extends Migration
                 $table->string('username', 64)->nullable();
                 $table->string('first_name', 64)->nullable();
                 $table->string('last_name', 64)->nullable();
-                $table->boolean('status')->default(true);
+                // Activity flag: 0 = inactive / blocked, 1 = active.
+                $table->boolean('status')->default(false);
                 $table->string('step', 255)->nullable();
                 $table->json('temp')->nullable();
-                // Default language mirrors config('app.default_language')
-                // which itself defaults to 'en' when DEFAULT_LANGUAGE is
-                // not set in .env.
-                $table->string('language', 10)->default('en');
+                // No default: an empty (NULL) value signals that the user
+                // has not chosen a language yet. StartHandler detects this
+                // and shows the language selection screen.
+                $table->string('language', 10)->nullable();
                 $table->timestamps();
             });
         }

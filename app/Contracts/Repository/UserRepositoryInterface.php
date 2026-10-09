@@ -6,7 +6,8 @@ namespace App\Contracts\Repository;
  * Interface for user repository operations.
  *
  * Defines the contract for managing user data, including retrieval,
- * synchronization, language preference, step management, and temporary data.
+ * synchronization, language preference, step management, activity
+ * status, and temporary data.
  */
 interface UserRepositoryInterface
 {
@@ -23,10 +24,21 @@ interface UserRepositoryInterface
     /**
      * Get the user's preferred language code.
      *
+     * Returns an empty string when the user has not chosen a language
+     * yet, so callers can distinguish "not set" from a valid code.
+     *
      * @param int $userId Telegram user ID.
-     * @return string Language code (e.g., 'en', 'fa').
+     * @return string Language code (e.g., 'en', 'fa'), or '' if unset.
      */
     public function getLanguage(int $userId): string;
+
+    /**
+     * Set the user's preferred language code.
+     *
+     * @param int    $userId   Telegram user ID.
+     * @param string $language Language code (e.g., 'en', 'fa').
+     */
+    public function setLanguage(int $userId, string $language): void;
 
     /**
      * Retrieve a user's data as an associative array.
@@ -74,4 +86,12 @@ interface UserRepositoryInterface
      * @param int $userId Telegram user ID.
      */
     public function clearTemp(int $userId): void;
+
+    /**
+     * Update the user's activity status.
+     *
+     * @param int $userId Telegram user ID.
+     * @param int $status 1 when the user is active, 0 when blocked or inactive.
+     */
+    public function setStatus(int $userId, int $status): void;
 }

@@ -40,7 +40,18 @@ class EloquentUserRepository implements UserRepositoryInterface, UserProviderInt
     public function getLanguage(int $userId): string
     {
         $user = User::where('user_id', $userId)->first();
-        return $user ? $user->language : $this->language->getDefaultLanguage();
+        if (!$user || $user->language === null || $user->language === '') {
+            return '';
+        }
+        return (string) $user->language;
+    }
+
+    public function setLanguage(int $userId, string $language): void
+    {
+        User::updateOrCreate(
+            ['user_id' => $userId],
+            ['language' => $language]
+        );
     }
 
     public function getUser(int $userId): ?array
@@ -86,6 +97,14 @@ class EloquentUserRepository implements UserRepositoryInterface, UserProviderInt
         User::updateOrCreate(
             ['user_id' => $userId],
             ['temp' => null]
+        );
+    }
+
+    public function setStatus(int $userId, int $status): void
+    {
+        User::updateOrCreate(
+            ['user_id' => $userId],
+            ['status' => $status]
         );
     }
 }

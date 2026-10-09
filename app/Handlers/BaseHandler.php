@@ -84,13 +84,22 @@ abstract class BaseHandler
         $this->client->sendMessage($chatId, $message, $keyboard, $extra);
     }
 
+    /**
+     * Resolve the language to use for replying to this update.
+     *
+     * Returns the user's stored language when it has been set, and the
+     * application default otherwise. This keeps every existing handler
+     * working before the user has completed the language selection flow.
+     */
     protected function getUserLanguage(): string
     {
         $userId = $this->fromId($this->update);
         if (!$userId) {
             return $this->language->getDefaultLanguage();
         }
-        return $this->userRepository->getLanguage($userId);
+
+        $lang = $this->userRepository->getLanguage($userId);
+        return $lang !== '' ? $lang : $this->language->getDefaultLanguage();
     }
 
     protected function getUserId(): ?int

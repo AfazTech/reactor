@@ -8,6 +8,11 @@ use App\Keyboard;
 
 /**
  * Handler for the /start and related commands.
+ *
+ * On the user's very first interaction (before they have chosen a
+ * language) this handler shows the language selection screen instead
+ * of the welcome message. Once a language is stored, the normal
+ * welcome flow is used.
  */
 #[Group('private')]
 #[Text(name: '/start', isCommand: true, priority: 100)]
@@ -19,8 +24,19 @@ class StartHandler extends BaseHandler
 {
     protected function handle(array $params = []): void
     {
-        $user = $this->extractUser($this->update);
-        if (!$user) {
+        $userId = $this->getUserId();
+        if (!$userId) {
+            return;
+        }
+
+        // First-time users have no language yet: ask them to choose.
+        if ($this->userRepository->getLanguage($userId) === '') {
+            $keyboard = (new Keyboard($this->language))->languageSelection();
+            $prompt = $this->language->get(
+                'choose_language',
+                $this->language->getDefaultLanguage()
+            );
+            $this->reply($prompt, $keyboard);
             return;
         }
 

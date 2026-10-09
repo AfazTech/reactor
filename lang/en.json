@@ -8,5 +8,7 @@
     "error": "An error occurred. Please try again.",
     "blocked": "You have been blocked for {duration} seconds due to spam.",
     "maintenance": "Bot is under maintenance. Please check back later.",
-    "welcome": "Welcome to the bot! Please use the menu."
+    "welcome": "Welcome to the bot! Please use the menu.",
+    "choose_language": "🌐 Please choose your language:",
+    "language_set": "Language set to English."
 }

@@ -8,7 +8,7 @@ use Reactor\Contracts\LanguageInterface;
  * Telegram keyboard builder for the application.
  *
  * Provides pre‑defined keyboards such as main menu, back button,
- * and custom menus.
+ * language selection, and custom menus.
  */
 class Keyboard
 {
@@ -81,5 +81,34 @@ class Keyboard
             $kb->row(...$row);
         }
         return $kb->resize(true)->oneTime(false)->build();
+    }
+
+    /**
+     * Build an inline keyboard for language selection.
+     *
+     * Every language reported by the language manager becomes one
+     * button whose callback data is "lang:<code>". The button label is
+     * the human-readable language name. Languages are provided as a
+     * flat row; callers can pass an explicit list to override the one
+     * discovered from the lang/ directory.
+     *
+     * @param array<int, string>|null $languages Optional list of codes.
+     * @return array Keyboard markup array.
+     */
+    public function languageSelection(?array $languages = null): array
+    {
+        $codes = $languages ?? $this->language->getAvailableLanguages();
+
+        $buttons = [];
+        foreach ($codes as $code) {
+            $buttons[] = [
+                'text'          => $this->language->getLanguageName($code),
+                'callback_data' => 'lang:' . $code,
+            ];
+        }
+
+        return (new KeyboardBuilder())
+            ->inlineButtonRow($buttons)
+            ->build();
     }
 }
