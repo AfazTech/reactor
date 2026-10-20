@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Reactor\Console\Support\BotProcessManager;
 use Reactor\Core\Container;
 use Reactor\Contracts\ServiceProviderInterface;
 use Reactor\Contracts\DatabaseManagerInterface;
@@ -11,10 +12,12 @@ use Reactor\Contracts\QueueManagerInterface;
 use Reactor\Contracts\UserProviderInterface;
 use Reactor\Queue\QueueManager;
 use Reactor\Queue\DatabaseQueue;
+use App\Console\ReactorProcessManager;
 use App\Contracts\Repository\UserRepositoryInterface;
 use App\Database\EloquentManager;
 use App\Repositories\EloquentUserRepository;
 use Reactor\Core\Config;
+use Reactor\Core\Paths;
 use Reactor\Cache\CacheManager;
 
 /**
@@ -27,6 +30,11 @@ use Reactor\Cache\CacheManager;
  * lifecycle, so any future internal state (caching, request-scoped
  * memoization, transactions) behaves consistently regardless of which
  * interface consumers depend on.
+ *
+ * BotProcessManager is overridden with ReactorProcessManager so that
+ * the "restart" command spawns the new detached polling process
+ * through the ./reactor entry point instead of the legacy
+ * reactor.php file, which this project does not ship.
  */
 class AppServiceProvider implements ServiceProviderInterface
 {
@@ -62,6 +70,16 @@ class AppServiceProvider implements ServiceProviderInterface
             return new QueueManager(
                 $c->get(Container::class),
                 $c->get(QueueManagerInterface::class)
+            );
+        });
+
+        // Override the framework's BotProcessManager so that
+        // `./reactor restart` spawns the new polling process through
+        // ./reactor instead of the removed reactor.php entry point.
+        $container->singleton(BotProcessManager::class, function ($c) {
+            return new ReactorProcessManager(
+                $c->get(Paths::class),
+                $c->get(Config::class)
             );
         });
     }

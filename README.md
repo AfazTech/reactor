@@ -152,7 +152,7 @@ DB_DATABASE=database/test.sqlite
 ### 3. Run migrations
 
 ```bash
-php reactor.php migrate
+./reactor migrate
 ```
 
 This creates the `users`, `jobs`, and `posts` tables.
@@ -160,7 +160,7 @@ This creates the `users`, `jobs`, and `posts` tables.
 ### 4. Start the bot
 
 ```bash
-php reactor.php start
+./reactor start
 ```
 
 You should see output like:
@@ -283,7 +283,7 @@ MySQL and other drivers are supported through `illuminate/database`. Just add a 
 ├── composer.json
 ├── LICENSE
 ├── README.md
-└── reactor.php                               # CLI entry point
+└── reactor                               # CLI entry point
 ```
 
 ---
@@ -499,7 +499,7 @@ class AwaitingNameStep extends BaseHandler
 Generate step handlers with:
 
 ```bash
-php reactor.php make:step AwaitingNameStep
+./reactor make:step AwaitingNameStep
 ```
 
 ### Example 5 — A Fallback Handler
@@ -555,7 +555,7 @@ No additional registration is required — the router picks it up automatically.
 ### Generating a Handler
 
 ```bash
-php reactor.php make:handler EchoHandler
+./reactor make:handler EchoHandler
 ```
 
 This creates `app/Handlers/EchoHandler.php` with a starter template.
@@ -655,7 +655,7 @@ use Reactor\Enums\MiddlewareMode;
 ### Generating a Middleware
 
 ```bash
-php reactor.php make:middleware AuthMiddleware
+./reactor make:middleware AuthMiddleware
 ```
 
 ### Dependency Injection in Middleware
@@ -830,13 +830,13 @@ Generate a new migration:
 
 ```bash
 # Plain migration
-php reactor.php migrate:make add_age_to_users_table
+./reactor migrate:make add_age_to_users_table
 
 # Create a new table (generates a create_*_table stub)
-php reactor.php migrate:make --create=posts
+./reactor migrate:make --create=posts
 
 # Modify an existing table (generates an update_*_table stub)
-php reactor.php migrate:make --table=users
+./reactor migrate:make --table=users
 ```
 
 Migration files are named `YYYY_MM_DD_HHMMSS_snake_case_name.php`. The class name is derived by CamelCasing the portion after the timestamp.
@@ -861,13 +861,13 @@ class DatabaseSeeder extends Seeder
 Run with:
 
 ```bash
-php reactor.php seed
+./reactor seed
 ```
 
 You can run a specific seeder class:
 
 ```bash
-php reactor.php seed --class="Reactor\Seeders\DatabaseSeeder"
+./reactor seed --class="Reactor\Seeders\DatabaseSeeder"
 ```
 
 ### Using the Database Directly
@@ -946,7 +946,7 @@ $queue->push(SendMessageJob::class, [
 ### Processing Jobs
 
 ```bash
-php reactor.php queue:work --queue=default --max=10
+./reactor queue:work --queue=default --max=10
 ```
 
 - `--queue` (or `-q`): queue name (default: `default`)
@@ -1113,10 +1113,10 @@ server {
 
 ## CLI Commands
 
-The `reactor.php` script at the project root bootstraps Reactor and exposes a Symfony Console application.
+The `reactor` script at the project root bootstraps Reactor and exposes a Symfony Console application.
 
 ```bash
-php reactor.php <command> [options] [arguments]
+./reactor <command> [options] [arguments]
 ```
 
 ### Migration Commands
@@ -1167,7 +1167,7 @@ php reactor.php <command> [options] [arguments]
 Run `schedule:run` every minute via cron:
 
 ```cron
-* * * * * cd /var/www/my-bot && php reactor.php schedule:run >> /dev/null 2>&1
+* * * * * cd /var/www/my-bot && ./reactor schedule:run >> /dev/null 2>&1
 ```
 
 Define scheduled tasks in a `ScheduleKernel` subclass (see `config/app.php` → `schedule_kernel`).
@@ -1206,7 +1206,7 @@ Before deploying your bot, make sure you have:
 - [ ] **Set `APP_ENV=production` and `DEBUG_MODE=false`** in `.env`.
 - [ ] **Set `TELEGRAM_VERIFY_SSL=true`** (never disable TLS verification in production).
 - [ ] **Protected your `.env`** – it should never be committed to Git and should be readable only by the web/CLI user.
-- [ ] **Run migrations** with `php reactor.php migrate` before starting.
+- [ ] **Run migrations** with `./reactor migrate` before starting.
 - [ ] **Configure a supervisor** for the queue worker and (in polling mode) for `bot.php`.
 - [ ] **Set up log rotation** – Monolog writes to `storage/logs/app.log` with a 30-day rotation policy out of the box.
 - [ ] **Add a cron entry** for `schedule:run` if you use the scheduler.
@@ -1225,7 +1225,7 @@ After=network.target
 Type=simple
 User=www-data
 WorkingDirectory=/var/www/my-bot
-ExecStart=/usr/bin/php /var/www/my-bot/reactor.php start
+ExecStart=/usr/bin/php /var/www/my-bot/reactor start
 Restart=always
 RestartSec=5
 StandardOutput=append:/var/log/my-bot.log
@@ -1246,7 +1246,7 @@ After=network.target mysql.service
 Type=simple
 User=www-data
 WorkingDirectory=/var/www/my-bot
-ExecStart=/usr/bin/php /var/www/my-bot/reactor.php queue:work --max=1000
+ExecStart=/usr/bin/php /var/www/my-bot/reactor queue:work --max=1000
 Restart=always
 RestartSec=5
 
