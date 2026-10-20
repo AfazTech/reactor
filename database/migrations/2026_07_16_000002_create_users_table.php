@@ -33,6 +33,26 @@ class CreateUsersTable extends Migration
                 // (message, callback, block/unblock event, ...).
                 $table->dateTime('last_interaction_at')->nullable();
                 $table->timestamps();
+
+                // Panel statistics query these columns as date ranges,
+                // so a plain B-Tree index is used directly. A whereDate()
+                // query would wrap the column in a function and bypass
+                // the index, which is why PanelStatsHandler uses
+                // whereBetween() instead.
+                $table->index('created_at');
+                $table->index('last_interaction_at');
+
+                // Distribution of users by preferred language, used by
+                // the admin panel and any future localised broadcast.
+                $table->index('language');
+
+                // Composite index for "list active users ordered by
+                // last interaction". The standalone last_interaction_at
+                // index above is still required for queries that filter
+                // by date alone (the panel "interacted today" counter),
+                // because the composite cannot serve a range on its
+                // second column when the first column is not filtered.
+                $table->index(['status', 'last_interaction_at']);
             });
         }
     }
