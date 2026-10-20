@@ -88,9 +88,10 @@ class Keyboard
      *
      * Every language reported by the language manager becomes one
      * button whose callback data is "lang:<code>". The button label is
-     * the human-readable language name. Languages are provided as a
-     * flat row; callers can pass an explicit list to override the one
-     * discovered from the lang/ directory.
+     * resolved by resolveLanguageName(), which prefers the
+     * "language_name" key inside each lang/<code>.json file over the
+     * framework's built-in name map, so adding a new language file is
+     * enough to give it a proper display name.
      *
      * @param array<int, string>|null $languages Optional list of codes.
      * @return array Keyboard markup array.
@@ -102,7 +103,7 @@ class Keyboard
         $buttons = [];
         foreach ($codes as $code) {
             $buttons[] = [
-                'text'          => $this->language->getLanguageName($code),
+                'text'          => $this->resolveLanguageName($code),
                 'callback_data' => 'lang:' . $code,
             ];
         }
@@ -110,5 +111,27 @@ class Keyboard
         return (new KeyboardBuilder())
             ->inlineButtonRow($buttons)
             ->build();
+    }
+
+    /**
+     * Resolve the human-readable name of a language.
+     *
+     * Preference order:
+     *   1. The "language_name" key inside lang/<code>.json.
+     *   2. The framework's name map (config app.language_names, then the
+     *      framework's internal default).
+     *   3. The raw language code as a last resort.
+     *
+     * The Language::get() method returns the key itself when no
+     * translation exists, which is the marker used to detect a missing
+     * entry without depending on any private API.
+     */
+    private function resolveLanguageName(string $code): string
+    {
+        $name = $this->language->get('language_name', $code);
+        if ($name !== 'language_name') {
+            return $name;
+        }
+        return $this->language->getLanguageName($code);
     }
 }
