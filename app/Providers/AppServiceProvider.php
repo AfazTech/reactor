@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use Reactor\Console\Commands\MigrateRefreshCommand as BaseMigrateRefreshCommand;
+use Reactor\Console\Commands\MigrateResetCommand as BaseMigrateResetCommand;
+use Reactor\Console\Commands\MigrateRollbackCommand as BaseMigrateRollbackCommand;
+use Reactor\Console\Commands\QueueFlushCommand as BaseQueueFlushCommand;
 use Reactor\Console\Commands\StartCommand as BaseStartCommand;
 use Reactor\Console\Support\BotProcessManager;
 use Reactor\Contracts\LoggerInterface;
@@ -14,8 +18,14 @@ use Reactor\Contracts\LanguageInterface;
 use Reactor\Contracts\CacheInterface;
 use Reactor\Contracts\QueueManagerInterface;
 use Reactor\Contracts\UserProviderInterface;
+use Reactor\Database\Migrations\Migrator;
+use Reactor\Queue\FailedJobRepository;
 use Reactor\Queue\QueueManager;
 use Reactor\Queue\DatabaseQueue;
+use App\Console\Commands\MigrateRefreshCommand;
+use App\Console\Commands\MigrateResetCommand;
+use App\Console\Commands\MigrateRollbackCommand;
+use App\Console\Commands\QueueFlushCommand;
 use App\Console\Commands\StartCommand;
 use App\Console\ReactorProcessManager;
 use App\Contracts\Repository\UserRepositoryInterface;
@@ -30,12 +40,17 @@ use Reactor\Cache\CacheManager;
  * framework-level UserProviderInterface and the application-level
  * UserRepositoryInterface are aliased to that same binding.
  *
- * Two framework classes are overridden via their abstract bindings:
+ * The following framework classes are overridden via their abstract
+ * bindings:
  *   - BotProcessManager, so `./reactor restart` spawns the new polling
  *     process through ./reactor instead of the removed reactor.php.
  *   - StartCommand, so `./reactor start` refuses to poll while a
- *     webhook is still registered (a state that otherwise produces a
- *     silent 409 Conflict and a dead-looking bot).
+ *     webhook is still registered.
+ *   - MigrateRefreshCommand / MigrateResetCommand / MigrateRollbackCommand,
+ *     so destructive migration operations require explicit
+ *     confirmation (or --force).
+ *   - QueueFlushCommand, so flushing every failed queue job requires
+ *     explicit confirmation (or --force).
  */
 class AppServiceProvider implements ServiceProviderInterface
 {
@@ -74,8 +89,7 @@ class AppServiceProvider implements ServiceProviderInterface
             );
         });
 
-        // Override the framework's BotProcessManager so `restart` uses
-        // the ./reactor entry point.
+        // Override BotProcessManager so `restart` uses ./reactor.
         $container->singleton(BotProcessManager::class, function ($c) {
             return new ReactorProcessManager(
                 $c->get(Paths::class),
@@ -83,13 +97,41 @@ class AppServiceProvider implements ServiceProviderInterface
             );
         });
 
-        // Override the framework's StartCommand so `start` checks for an
-        // active webhook before polling.
+        // Override StartCommand so `start` checks for an active webhook.
         $container->singleton(BaseStartCommand::class, function ($c) {
             return new StartCommand(
                 $c->get(\Reactor\Core\App::class),
                 $c->get(LoggerInterface::class),
                 $c->get(Container::class),
+            );
+        });
+
+        // Destructive migration operations require confirmation.
+        $container->singleton(BaseMigrateRefreshCommand::class, function ($c) {
+            return new MigrateRefreshCommand(
+                $c->get(LoggerInterface::class),
+                $c->get(Migrator::class)
+            );
+        });
+
+        $container->singleton(BaseMigrateResetCommand::class, function ($c) {
+            return new MigrateResetCommand(
+                $c->get(LoggerInterface::class),
+                $c->get(Migrator::class)
+            );
+        });
+
+        $container->singleton(BaseMigrateRollbackCommand::class, function ($c) {
+            return new MigrateRollbackCommand(
+                $c->get(LoggerInterface::class),
+                $c->get(Migrator::class)
+            );
+        });
+
+        // Flushing failed jobs requires confirmation.
+        $container->singleton(BaseQueueFlushCommand::class, function ($c) {
+            return new QueueFlushCommand(
+                $c->get(FailedJobRepository::class)
             );
         });
     }
