@@ -2,8 +2,12 @@
 
 namespace App\Providers;
 
+use Reactor\Console\Commands\StartCommand as BaseStartCommand;
 use Reactor\Console\Support\BotProcessManager;
+use Reactor\Contracts\LoggerInterface;
+use Reactor\Core\Config;
 use Reactor\Core\Container;
+use Reactor\Core\Paths;
 use Reactor\Contracts\ServiceProviderInterface;
 use Reactor\Contracts\DatabaseManagerInterface;
 use Reactor\Contracts\LanguageInterface;
@@ -12,12 +16,11 @@ use Reactor\Contracts\QueueManagerInterface;
 use Reactor\Contracts\UserProviderInterface;
 use Reactor\Queue\QueueManager;
 use Reactor\Queue\DatabaseQueue;
+use App\Console\Commands\StartCommand;
 use App\Console\ReactorProcessManager;
 use App\Contracts\Repository\UserRepositoryInterface;
 use App\Database\EloquentManager;
 use App\Repositories\EloquentUserRepository;
-use Reactor\Core\Config;
-use Reactor\Core\Paths;
 use Reactor\Cache\CacheManager;
 
 /**
@@ -25,16 +28,14 @@ use Reactor\Cache\CacheManager;
  *
  * The user repository is registered as a single singleton and both the
  * framework-level UserProviderInterface and the application-level
- * UserRepositoryInterface are aliased to that same binding. This
- * guarantees a single shared instance across the whole request
- * lifecycle, so any future internal state (caching, request-scoped
- * memoization, transactions) behaves consistently regardless of which
- * interface consumers depend on.
+ * UserRepositoryInterface are aliased to that same binding.
  *
- * BotProcessManager is overridden with ReactorProcessManager so that
- * the "restart" command spawns the new detached polling process
- * through the ./reactor entry point instead of the legacy
- * reactor.php file, which this project does not ship.
+ * Two framework classes are overridden via their abstract bindings:
+ *   - BotProcessManager, so `./reactor restart` spawns the new polling
+ *     process through ./reactor instead of the removed reactor.php.
+ *   - StartCommand, so `./reactor start` refuses to poll while a
+ *     webhook is still registered (a state that otherwise produces a
+ *     silent 409 Conflict and a dead-looking bot).
  */
 class AppServiceProvider implements ServiceProviderInterface
 {
@@ -43,7 +44,7 @@ class AppServiceProvider implements ServiceProviderInterface
         $container->singleton(DatabaseManagerInterface::class, function ($c) {
             return new EloquentManager(
                 $c->get(Config::class),
-                $c->get(\Reactor\Contracts\LoggerInterface::class)
+                $c->get(LoggerInterface::class)
             );
         });
 
@@ -73,13 +74,22 @@ class AppServiceProvider implements ServiceProviderInterface
             );
         });
 
-        // Override the framework's BotProcessManager so that
-        // `./reactor restart` spawns the new polling process through
-        // ./reactor instead of the removed reactor.php entry point.
+        // Override the framework's BotProcessManager so `restart` uses
+        // the ./reactor entry point.
         $container->singleton(BotProcessManager::class, function ($c) {
             return new ReactorProcessManager(
                 $c->get(Paths::class),
                 $c->get(Config::class)
+            );
+        });
+
+        // Override the framework's StartCommand so `start` checks for an
+        // active webhook before polling.
+        $container->singleton(BaseStartCommand::class, function ($c) {
+            return new StartCommand(
+                $c->get(\Reactor\Core\App::class),
+                $c->get(LoggerInterface::class),
+                $c->get(Container::class),
             );
         });
     }
