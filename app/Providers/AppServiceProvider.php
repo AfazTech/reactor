@@ -51,6 +51,11 @@ use Reactor\Cache\CacheManager;
  *     confirmation (or --force).
  *   - QueueFlushCommand, so flushing every failed queue job requires
  *     explicit confirmation (or --force).
+ *
+ * QueueManagerInterface is bound here (overriding the framework's
+ * fallback) so that retry_after is sourced from config/queue.php.
+ * Without this binding the framework still uses the same default, but
+ * operators cannot tune the window without editing framework code.
  */
 class AppServiceProvider implements ServiceProviderInterface
 {
@@ -79,7 +84,15 @@ class AppServiceProvider implements ServiceProviderInterface
         });
 
         $container->singleton(QueueManagerInterface::class, function ($c) {
-            return new DatabaseQueue($c->get(DatabaseManagerInterface::class));
+            $config = $c->get(Config::class);
+            $retryAfter = (int) $config->get('queue.retry_after', 90);
+            $table = (string) $config->get('queue.table', 'jobs');
+
+            return new DatabaseQueue(
+                $c->get(DatabaseManagerInterface::class),
+                $table,
+                $retryAfter
+            );
         });
 
         $container->singleton(QueueManager::class, function ($c) {
