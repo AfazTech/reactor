@@ -14,10 +14,14 @@ use Reactor\Core\Container;
 use Reactor\Core\Paths;
 use Reactor\Contracts\ServiceProviderInterface;
 use Reactor\Contracts\DatabaseManagerInterface;
+use Reactor\Contracts\AsyncDatabaseManagerInterface;
 use Reactor\Contracts\LanguageInterface;
 use Reactor\Contracts\CacheInterface;
 use Reactor\Contracts\QueueManagerInterface;
 use Reactor\Contracts\UserProviderInterface;
+use Reactor\Database\Async\AsyncMysqlManager;
+use Reactor\Database\Async\AsyncPostgresManager;
+use Reactor\Database\Async\AsyncSqliteManager;
 use Reactor\Database\Migrations\Migrator;
 use Reactor\Queue\FailedJobRepository;
 use Reactor\Queue\QueueManager;
@@ -36,26 +40,12 @@ use Reactor\Cache\CacheManager;
 /**
  * Application service provider.
  *
- * The user repository is registered as a single singleton and both the
- * framework-level UserProviderInterface and the application-level
- * UserRepositoryInterface are aliased to that same binding.
- *
- * The following framework classes are overridden via their abstract
- * bindings:
- *   - BotProcessManager, so `./reactor restart` spawns the new polling
- *     process through ./reactor instead of the removed reactor.php.
- *   - StartCommand, so `./reactor start` refuses to poll while a
- *     webhook is still registered.
- *   - MigrateRefreshCommand / MigrateResetCommand / MigrateRollbackCommand,
- *     so destructive migration operations require explicit
- *     confirmation (or --force).
- *   - QueueFlushCommand, so flushing every failed queue job requires
- *     explicit confirmation (or --force).
- *
- * QueueManagerInterface is bound here (overriding the framework's
- * fallback) so that retry_after is sourced from config/queue.php.
- * Without this binding the framework still uses the same default, but
- * operators cannot tune the window without editing framework code.
+ * Both the synchronous Eloquent-based database manager and the
+ * asynchronous AMPHP-backed driver are bound here. They share the same
+ * connection settings (config/database.php), so operators only have
+ * one place to configure database credentials. Handlers that need
+ * non-blocking database access type-hint AsyncDatabaseManagerInterface;
+ * everything else keeps using Eloquent through DatabaseManagerInterface.
  */
 class AppServiceProvider implements ServiceProviderInterface
 {
@@ -66,6 +56,24 @@ class AppServiceProvider implements ServiceProviderInterface
                 $c->get(Config::class),
                 $c->get(LoggerInterface::class)
             );
+        });
+
+        // Asynchronous database manager. Reuses the exact connection
+        // settings that the Eloquent manager reads, so there is no
+        // separate configuration block to maintain.
+        $container->singleton(AsyncDatabaseManagerInterface::class, function ($c) {
+            $config = $c->get(Config::class);
+            $connection = $config->getDatabaseConfig();
+            $driver = strtolower((string) ($connection['driver'] ?? 'sqlite'));
+
+            return match ($driver) {
+                'mysql', 'mariadb'               => new AsyncMysqlManager($connection),
+                'pgsql', 'postgres', 'postgresql' => new AsyncPostgresManager($connection),
+                'sqlite'                         => $this->createAsyncSqliteManager($connection),
+                default                          => throw new \InvalidArgumentException(
+                    "No async database driver available for driver: {$driver}"
+                ),
+            };
         });
 
         // Single concrete repository bound once; both interfaces alias it.
@@ -152,5 +160,30 @@ class AppServiceProvider implements ServiceProviderInterface
     public function boot(Container $container): void
     {
         // Nothing to boot
+    }
+
+    /**
+     * Create the async SQLite driver, ensuring the database file
+     * exists with the same restrictive permissions used by the
+     * Eloquent manager (0640). The :memory: path is left untouched.
+     */
+    private function createAsyncSqliteManager(array $connection): AsyncSqliteManager
+    {
+        $databasePath = (string) ($connection['database'] ?? ':memory:');
+
+        if ($databasePath !== ':memory:') {
+            $directory = dirname($databasePath);
+
+            if (!is_dir($directory)) {
+                mkdir($directory, 0755, true);
+            }
+
+            if (!file_exists($databasePath)) {
+                touch($databasePath);
+                chmod($databasePath, 0640);
+            }
+        }
+
+        return new AsyncSqliteManager($connection);
     }
 }
