@@ -17,15 +17,21 @@ $config = $app->getConfig();
 
 $secret = $config->getWebhookSecret();
 
+if ($secret === '') {
+    http_response_code(403);
+    $logger->error('Webhook rejected: WEBHOOK_SECRET is not configured');
+    exit;
+}
+
 try {
     $update = $client->handleUpdate($secret);
 
     if (!empty($update)) {
-        $logger->debug("Webhook received update", ['type' => array_keys($update)]);
+        $logger->debug('Webhook received update', ['type' => array_keys($update)]);
         $app->processUpdate($update);
     } else {
-        $logger->debug("Empty update received");
+        $logger->debug('Empty update received');
     }
 } catch (Throwable $e) {
-    $logger->error("Webhook error: " . $e->getMessage() . "\n" . $e->getTraceAsString());
+    $logger->error('Webhook error: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
 }
