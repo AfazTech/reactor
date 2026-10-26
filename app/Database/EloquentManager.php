@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Database;
 
 use Illuminate\Database\Capsule\Manager as Capsule;
@@ -10,21 +11,12 @@ use Reactor\Contracts\LoggerInterface;
 
 /**
  * Eloquent-based implementation of the database manager.
- *
- * This class wraps Illuminate's Capsule/Manager to provide a unified
- * interface for schema, query builder, and transaction management.
  */
 class EloquentManager implements DatabaseManagerInterface
 {
     private Capsule $capsule;
     private LoggerInterface $logger;
 
-    /**
-     * Constructor.
-     *
-     * @param Config          $config Application configuration.
-     * @param LoggerInterface $logger Logger instance.
-     */
     public function __construct(Config $config, LoggerInterface $logger)
     {
         $this->logger = $logger;
@@ -35,40 +27,39 @@ class EloquentManager implements DatabaseManagerInterface
         $this->capsule->setAsGlobal();
         $this->capsule->bootEloquent();
         $this->verifyConnection($configArray);
-        $this->logger->debug("Eloquent database manager initialized");
+        $this->logger->debug('Eloquent database manager initialized');
     }
 
     /**
      * Ensure the SQLite database file and its directory exist.
      *
-     * @param array $config Database configuration array.
+     * The file is created with mode 0640 (owner read/write, group read)
+     * instead of 0666 so that other local users cannot read or modify
+     * the database.
      */
     private function ensureDatabaseFile(array $config): void
     {
         if (($config['driver'] ?? null) !== 'sqlite') {
             return;
         }
+
         $databasePath = $config['database'];
         $databaseDir = dirname($databasePath);
+
         if (!is_dir($databaseDir)) {
             mkdir($databaseDir, 0755, true);
-            $this->logger->debug("Database directory created: " . $databaseDir);
+            $this->logger->debug('Database directory created: ' . $databaseDir);
         }
+
         if (!file_exists($databasePath)) {
             touch($databasePath);
-            chmod($databasePath, 0666);
-            $this->logger->info("SQLite database file created: " . $databasePath);
+            chmod($databasePath, 0640);
+            $this->logger->info('SQLite database file created: ' . $databasePath);
         }
     }
 
     /**
      * Verify the database connection is usable.
-     *
-     * For non-SQLite drivers (MySQL, PostgreSQL) the SQLite file check
-     * above is a no-op, so we perform an eager PDO handshake here to
-     * fail fast with a clear error instead of failing on the first query.
-     *
-     * @param array $config Database configuration array.
      */
     private function verifyConnection(array $config): void
     {
@@ -79,9 +70,9 @@ class EloquentManager implements DatabaseManagerInterface
 
         try {
             $this->capsule->connection()->getPdo();
-            $this->logger->debug("Database connection verified", ['driver' => $driver]);
+            $this->logger->debug('Database connection verified', ['driver' => $driver]);
         } catch (\Throwable $e) {
-            $this->logger->critical("Database connection failed", [
+            $this->logger->critical('Database connection failed', [
                 'driver'  => $driver,
                 'message' => $e->getMessage(),
             ]);
@@ -93,65 +84,41 @@ class EloquentManager implements DatabaseManagerInterface
         }
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function connection(): object
     {
         return $this->capsule->connection();
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function schema(): SchemaBuilder
     {
         return $this->capsule->schema();
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function table(string $table): QueryBuilder
     {
         return $this->capsule->table($table);
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function beginTransaction(): void
     {
         $this->capsule->connection()->beginTransaction();
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function commit(): void
     {
         $this->capsule->connection()->commit();
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function rollBack(): void
     {
         $this->capsule->connection()->rollBack();
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function transaction(callable $callback)
     {
         return $this->capsule->connection()->transaction($callback);
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function getConfig(): array
     {
         return $this->capsule->getConnection()->getConfig();
