@@ -13,17 +13,6 @@ return [
             'prefix' => env('CACHE_PREFIX', 'reactor:'),
         ],
 
-        'memcached' => [
-            'driver' => 'memcached',
-            'servers' => [
-                [
-                    'host' => env('MEMCACHED_HOST', '127.0.0.1'),
-                    'port' => env('MEMCACHED_PORT', 11211),
-                ],
-            ],
-            'prefix' => env('CACHE_PREFIX', 'reactor:'),
-        ],
-
         'file' => [
             'driver' => 'file',
             'path' => storage_path('cache'),
