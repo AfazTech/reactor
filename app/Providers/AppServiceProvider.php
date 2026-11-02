@@ -8,6 +8,7 @@ use Reactor\Console\Commands\MigrateRollbackCommand as BaseMigrateRollbackComman
 use Reactor\Console\Commands\QueueFlushCommand as BaseQueueFlushCommand;
 use Reactor\Console\Commands\StartCommand as BaseStartCommand;
 use Reactor\Console\Support\BotProcessManager;
+use Reactor\Console\Support\EntryPointResolver;
 use Reactor\Contracts\LoggerInterface;
 use Reactor\Core\Config;
 use Reactor\Core\Container;
@@ -114,7 +115,8 @@ class AppServiceProvider implements ServiceProviderInterface
         $container->singleton(BotProcessManager::class, function ($c) {
             return new ReactorProcessManager(
                 $c->get(Paths::class),
-                $c->get(Config::class)
+                $c->get(Config::class),
+                $c->get(EntryPointResolver::class),
             );
         });
 
