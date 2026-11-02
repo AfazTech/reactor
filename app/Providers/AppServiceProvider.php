@@ -36,6 +36,7 @@ use App\Console\ReactorProcessManager;
 use App\Contracts\Repository\UserRepositoryInterface;
 use App\Database\EloquentManager;
 use App\Repositories\EloquentUserRepository;
+use App\Repositories\AsyncUserRepository;
 use Reactor\Cache\CacheManager;
 
 /**
@@ -46,7 +47,9 @@ use Reactor\Cache\CacheManager;
  * connection settings (config/database.php), so operators only have
  * one place to configure database credentials. Handlers that need
  * non-blocking database access type-hint AsyncDatabaseManagerInterface;
- * everything else keeps using Eloquent through DatabaseManagerInterface.
+ * user persistence defaults to AsyncUserRepository. Both concrete repositories
+ * can be injected together; DatabaseManagerInterface remains available for
+ * models, migrations and worker operations.
  */
 class AppServiceProvider implements ServiceProviderInterface
 {
@@ -77,13 +80,14 @@ class AppServiceProvider implements ServiceProviderInterface
             };
         });
 
-        // Single concrete repository bound once; both interfaces alias it.
-        $container->singleton(EloquentUserRepository::class, function ($c) {
-            return new EloquentUserRepository($c->get(LanguageInterface::class));
-        });
-
-        $container->alias(UserProviderInterface::class, EloquentUserRepository::class);
-        $container->alias(UserRepositoryInterface::class, EloquentUserRepository::class);
+        $container->singleton(AsyncUserRepository::class, fn ($c) => new AsyncUserRepository(
+            $c->get(AsyncDatabaseManagerInterface::class)
+        ));
+        $container->singleton(EloquentUserRepository::class, fn ($c) => new EloquentUserRepository(
+            $c->get(LanguageInterface::class)
+        ));
+        $container->alias(UserRepositoryInterface::class, AsyncUserRepository::class);
+        $container->alias(UserProviderInterface::class, AsyncUserRepository::class);
 
         $container->singleton(CacheInterface::class, function ($c) {
             $config = $c->get(Config::class);
@@ -107,7 +111,8 @@ class AppServiceProvider implements ServiceProviderInterface
         $container->singleton(QueueManager::class, function ($c) {
             return new QueueManager(
                 $c->get(Container::class),
-                $c->get(QueueManagerInterface::class)
+                $c->get(QueueManagerInterface::class),
+                $c->get(AsyncDatabaseManagerInterface::class),
             );
         });
 

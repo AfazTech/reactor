@@ -229,6 +229,7 @@ MySQL and other drivers are supported through `illuminate/database`. Add a conne
 │   ├── Providers/
 │   │   └── AppServiceProvider.php
 │   └── Repositories/
+│       ├── AsyncUserRepository.php
 │       └── EloquentUserRepository.php
 ├── bootstrap/
 │   └── cache/
@@ -723,7 +724,7 @@ For Neili's full keyboard builder API — reply rows, inline rows, URL buttons, 
 
 ## Working with the Database
 
-The skeleton uses `illuminate/database` (Eloquent) via the `EloquentManager` class, which implements the framework's `DatabaseManagerInterface`. Migrations are run through the CLI, and models are standard Eloquent models.
+The default bot request path uses `AsyncUserRepository` with `AsyncDatabaseManagerInterface` (AMPHP). SQLite is the default connection. Eloquent remains available through `EloquentManager` / `DatabaseManagerInterface` for migrations, worker operations and direct model access. Eloquent queries are synchronous; choosing an async user repository does not change how Eloquent itself executes queries.
 
 ### Models
 
@@ -754,7 +755,15 @@ class User extends Model
 
 ### Repository Pattern
 
-User persistence is abstracted behind `UserRepositoryInterface` (`app/Contracts/Repository/UserRepositoryInterface.php`). The concrete implementation is `EloquentUserRepository`.
+User persistence is abstracted behind `UserRepositoryInterface` (`app/Contracts/Repository/UserRepositoryInterface.php`). The default implementation is `AsyncUserRepository`. Its methods preserve the existing return types while awaiting non-blocking AMPHP queries internally, so middleware, handlers, routing language lookups and user step lookups do not block the bot event loop.
+
+Both `AsyncUserRepository` and `EloquentUserRepository` can be constructor-injected
+and used simultaneously. `UserRepositoryInterface` and `UserProviderInterface`
+default to the same async singleton. Inject `EloquentUserRepository` explicitly
+where ORM persistence is needed; there is no environment-variable switch.
+Both implementations use the same database connection settings and users table.
+Direct `App\Models\User` access is also available; Eloquent operations remain
+synchronous.
 
 The repository is registered in `AppServiceProvider` and both the framework-level `UserProviderInterface` and the application-level `UserRepositoryInterface` alias the **same singleton**, so consumers get a consistent instance.
 

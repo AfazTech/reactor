@@ -29,7 +29,9 @@ It is the fastest way to start a new project and the recommended path for explor
 
 ## Requirements
 
-- `afaztech/reactor-framework` ^0.5.0
+- PHP >= 8.4
+- `afaztech/reactor-framework` ^0.8.0
+- `afaztech/neili` ^4.0
 
 ## Installation
 
@@ -61,3 +63,32 @@ Contributions are welcome. Please read the contribution guidelines.
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
+
+## Async database access and optional Eloquent
+
+User synchronization, language selection, routing state and temporary user data
+use `AsyncUserRepository` by default. Its existing repository methods await
+AMPHP database queries internally: the current fiber waits, while the bot event
+loop remains free. The default database is SQLite with the async SQLite driver.
+
+Both repositories are available at the same time through constructor injection:
+
+```php
+use App\Repositories\AsyncUserRepository;
+use App\Repositories\EloquentUserRepository;
+
+public function __construct(
+    private AsyncUserRepository $asyncUsers,
+    private EloquentUserRepository $eloquentUsers,
+) {}
+```
+
+`UserRepositoryInterface` and the framework's `UserProviderInterface` resolve to
+the same async repository by default. Request `EloquentUserRepository` explicitly
+where synchronous ORM access is needed; no environment switch is required.
+Both repositories use the same database and users table. Eloquent models such as
+`App\Models\User` and `DatabaseManagerInterface` remain available for custom
+code, migrations and worker operations. Direct Eloquent queries are synchronous;
+prefer `AsyncDatabaseManagerInterface` for I/O in the polling process.
+
+Run application tests with `composer test` after `composer install`.
