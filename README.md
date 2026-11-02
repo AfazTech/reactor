@@ -30,7 +30,7 @@ It is the fastest way to start a new project and the recommended path for explor
 ## Requirements
 
 - PHP >= 8.4
-- `afaztech/reactor-framework` ^0.8.0
+- `afaztech/reactor-framework` 0.8.x-dev (current development branch; these changes are not tagged yet)
 - `afaztech/neili` ^4.0
 
 ## Installation
