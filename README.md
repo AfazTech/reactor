@@ -109,3 +109,23 @@ Direct `AsyncUserRepository`, `EloquentUserRepository`, ORM or SQL operations
 bypass the decorator. After a direct write in the same update, call
 `$cachedUsers->forgetUser($userId)` before another cached read. This is a short
 per-update snapshot, not a cross-update or cross-process cache.
+
+
+## Bot development features
+
+The development framework includes conversation flows, same-user update ordering,
+`#[Throttle]`, user-bound callback payloads, `FakeTelegram` / `BotTestHarness`,
+queued event listeners and `reactor doctor` / `reactor metrics`. The default
+skeleton installs conversation middleware and async query instrumentation.
+Register your flow definitions and queued listener classes in a service provider's
+`boot()` method. See the framework's [feature guide](https://github.com/AfazTech/reactor-framework/blob/main/FEATURES.md).
+
+When developing both repositories before pushing the framework, run:
+
+```bash
+REACTOR_FRAMEWORK_PATH=/workspace/reactor-framework composer test
+```
+
+A live test is explicit: `php tests/live-smoke.php` sends, edits and deletes one
+message using test credentials supplied through secure environment bindings or
+JSON on stdin. It is never run by `composer test` and does not store credentials.
