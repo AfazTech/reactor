@@ -72,7 +72,7 @@ class AppServiceProvider implements ServiceProviderInterface
             $connection = $config->getDatabaseConfig();
             $driver = strtolower((string) ($connection['driver'] ?? 'sqlite'));
 
-            return match ($driver) {
+            $database = match ($driver) {
                 'mysql', 'mariadb'               => new AsyncMysqlManager($connection),
                 'pgsql', 'postgres', 'postgresql' => new AsyncPostgresManager($connection),
                 'sqlite'                         => $this->createAsyncSqliteManager($connection),
@@ -80,6 +80,7 @@ class AppServiceProvider implements ServiceProviderInterface
                     "No async database driver available for driver: {$driver}"
                 ),
             };
+            return new \Reactor\Diagnostics\MeasuredDatabase($database, $c->get(\Reactor\Diagnostics\RuntimeMetrics::class));
         });
 
         $container->singleton(AsyncUserRepository::class, fn ($c) => new AsyncUserRepository(

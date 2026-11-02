@@ -1,6 +1,10 @@
 #!/usr/bin/env php
 <?php
 
+if (PHP_SAPI === 'cli' && in_array($argv[1] ?? '', ['doctor', 'metrics'], true)) {
+    ini_set('display_errors', 'stderr');
+}
+
 require __DIR__ . '/vendor/autoload.php';
 
 use Reactor\Console\Kernel;
@@ -14,6 +18,24 @@ if (file_exists(__DIR__ . '/.env')) {
 }
 
 $basePath = __DIR__;
+
+// Diagnostics must remain usable when normal application/database boot fails.
+if (in_array($argv[1] ?? '', ['doctor', 'metrics'], true)) {
+    if (!defined('REACTOR_BASE_PATH')) { define('REACTOR_BASE_PATH', $basePath); }
+    $container = new \Reactor\Core\Container();
+    $container->instance(\Reactor\Core\Paths::class, new \Reactor\Core\Paths($basePath));
+    (new \Reactor\Core\Providers\CoreServiceProvider())->register($container);
+    (new \App\Providers\AppServiceProvider())->register($container);
+    if (($argv[1] ?? '') === 'doctor' && in_array('--telegram', $argv, true)) {
+        (new \Reactor\Core\Bootstrappers\TelegramBootstrapper())->bootstrap($container);
+    }
+    $console = new Application('Reactor diagnostics');
+    $console->add($container->get(\Reactor\Console\Commands\DoctorCommand::class));
+    $console->add($container->get(\Reactor\Console\Commands\MetricsCommand::class));
+    $console->run();
+    return;
+}
+
 $appProviders = [
     \App\Providers\AppServiceProvider::class,
 ];
