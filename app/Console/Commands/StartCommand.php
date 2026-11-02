@@ -67,6 +67,12 @@ class StartCommand extends BaseStartCommand
             'Automatically delete any active webhook before polling starts'
         );
         $this->addOption(
+            'drop-pending-updates',
+            null,
+            InputOption::VALUE_NONE,
+            'Discard pending Telegram updates when deleting the webhook (default: preserve them)'
+        );
+        $this->addOption(
             'keep-webhook',
             null,
             InputOption::VALUE_NONE,
@@ -153,7 +159,7 @@ class StartCommand extends BaseStartCommand
         }
 
         try {
-            $client->deleteWebhook(true)->await();
+            $client->deleteWebhook((bool) $input->getOption('drop-pending-updates'))->await();
         } catch (\Throwable $e) {
             $output->writeln('<error>Failed to delete webhook: ' . $e->getMessage() . '</error>');
             $this->logger->error('Failed to delete webhook', ['error' => $e->getMessage()]);
