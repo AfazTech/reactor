@@ -37,6 +37,8 @@ use App\Contracts\Repository\UserRepositoryInterface;
 use App\Database\EloquentManager;
 use App\Repositories\EloquentUserRepository;
 use App\Repositories\AsyncUserRepository;
+use App\Repositories\UpdateCachedUserRepository;
+use Reactor\Core\UpdateScope;
 use Reactor\Cache\CacheManager;
 
 /**
@@ -86,8 +88,20 @@ class AppServiceProvider implements ServiceProviderInterface
         $container->singleton(EloquentUserRepository::class, fn ($c) => new EloquentUserRepository(
             $c->get(LanguageInterface::class)
         ));
-        $container->alias(UserRepositoryInterface::class, AsyncUserRepository::class);
-        $container->alias(UserProviderInterface::class, AsyncUserRepository::class);
+        // Shared with the framework update processor, but not globally shared
+        // cache data: UpdateScope isolates frames by Fiber and update lifetime.
+        if (!$container->has(UpdateScope::class)) {
+            $container->singleton(UpdateScope::class, fn () => new UpdateScope());
+        }
+        $container->singleton(UpdateCachedUserRepository::class, fn ($c) => new UpdateCachedUserRepository(
+            $c->get(AsyncUserRepository::class), $c->get(UpdateScope::class)
+        ));
+        $container->singleton(UserRepositoryInterface::class, fn ($c) => $c->get(
+            $c->get(Config::class)->getBotMode() === 'polling'
+                ? UpdateCachedUserRepository::class
+                : AsyncUserRepository::class
+        ));
+        $container->alias(UserProviderInterface::class, UserRepositoryInterface::class);
 
         $container->singleton(CacheInterface::class, function ($c) {
             $config = $c->get(Config::class);
@@ -113,6 +127,7 @@ class AppServiceProvider implements ServiceProviderInterface
                 $c->get(Container::class),
                 $c->get(QueueManagerInterface::class),
                 $c->get(AsyncDatabaseManagerInterface::class),
+                (string) $c->get(Config::class)->get('queue.table', 'jobs'),
             );
         });
 

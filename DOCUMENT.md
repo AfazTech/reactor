@@ -755,6 +755,16 @@ class User extends Model
 
 ### Repository Pattern
 
+Polling mode wraps the async repository in `UpdateCachedUserRepository` for the
+default interfaces. A Fiber-local `UpdateScope` spans routing, middleware and
+handler execution; the frame is always discarded after the update. Reads of
+language, step, temp and user share one row. Successful decorator writes
+invalidate it; writes made directly through raw repositories or Eloquent require
+`forgetUser($userId)` before another cached read in that update. No cache is kept
+between updates or outside an update scope, and webhook mode keeps the raw async
+repository. Both raw repository classes remain available for direct injection.
+
+
 User persistence is abstracted behind `UserRepositoryInterface` (`app/Contracts/Repository/UserRepositoryInterface.php`). The default implementation is `AsyncUserRepository`. Its methods preserve the existing return types while awaiting non-blocking AMPHP queries internally, so middleware, handlers, routing language lookups and user step lookups do not block the bot event loop.
 
 Both `AsyncUserRepository` and `EloquentUserRepository` can be constructor-injected
@@ -771,7 +781,7 @@ Available methods:
 
 | Method | Description |
 |--------|-------------|
-| `syncUser(int $userId, ?string $username, ?string $firstName, ?string $lastName)` | Upsert a user |
+| `syncUser(int $userId, ?string $username, ?string $firstName, ?string $lastName): bool` | Sync profile; true only for the call that inserted the user |
 | `getLanguage(int $userId): string` | Get the user's preferred language |
 | `setLanguage(int $userId, string $language)` | Persist a language preference |
 | `getUser(int $userId): ?array` | Fetch the user as an array |

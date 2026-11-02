@@ -63,10 +63,7 @@ class SyncUserMiddleware implements MiddlewareInterface
         }
 
         $userId = (int) $user['id'];
-        $existing = $this->userRepository->getUser($userId);
-        $isNew = ($existing === null);
-
-        $this->userRepository->syncUser(
+        $isNew = $this->userRepository->syncUser(
             $userId,
             $user['username']   ?? null,
             $user['first_name'] ?? null,

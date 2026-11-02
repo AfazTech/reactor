@@ -9,6 +9,7 @@ use App\Middleware\SyncUserMiddleware;
 use App\Models\User;
 use App\Providers\AppServiceProvider;
 use App\Repositories\AsyncUserRepository;
+use App\Repositories\UpdateCachedUserRepository;
 use App\Repositories\EloquentUserRepository;
 use Neili\Client;
 use Amp\Future;
@@ -68,7 +69,7 @@ class UserRepositoryTest extends TestCase
     public function testDefaultRepositoryUsesAsyncQueriesAndPreservesUserState(): void
     {
         $repo = $this->container->get(UserRepositoryInterface::class);
-        self::assertInstanceOf(AsyncUserRepository::class, $repo);
+        self::assertInstanceOf(UpdateCachedUserRepository::class, $repo);
         self::assertSame($repo, $this->container->get(UserProviderInterface::class));
         self::assertNull($repo->getUser(123));
         self::assertSame('', $repo->getLanguage(123));
@@ -95,11 +96,63 @@ class UserRepositoryTest extends TestCase
         self::assertNull($repo->getTemp(123));
     }
 
+    public function testConcurrentUpdatesRegisterTheUserOnlyOnceAcrossIndependentConnections(): void
+    {
+        $first = $this->container->get(UserRepositoryInterface::class);
+        $second = new AsyncUserRepository(new \Reactor\Database\Async\AsyncSqliteManager([
+            'database' => $this->database,
+        ]));
+        $events = new EventDispatcher();
+        $registered = 0;
+        $events->on(Events::USER_REGISTERED, function () use (&$registered) { $registered++; });
+        $logger = $this->container->get(LoggerInterface::class);
+        $middlewares = [new SyncUserMiddleware($first, $logger, $events), new SyncUserMiddleware($second, $logger, $events)];
+        $update = ['message' => ['from' => ['id' => 4321, 'first_name' => 'Concurrent']]];
+        $futures = [];
+        for ($i = 0; $i < 10; $i++) {
+            $middleware = $middlewares[$i % 2];
+            $futures[] = \Amp\async(fn () => $middleware->handle($update));
+        }
+        \Amp\Future\await($futures, new \Amp\TimeoutCancellation(5));
+        self::assertSame(1, $registered);
+        self::assertSame(1, User::where('user_id', 4321)->count());
+        self::assertSame('Concurrent', $first->getUser(4321)['first_name']);
+        self::assertTrue($first->getUser(4321)['status']);
+    }
+
+    public function testBothRepositoryImplementationsReportCreationOnlyOnce(): void
+    {
+        foreach ([AsyncUserRepository::class, EloquentUserRepository::class] as $index => $class) {
+            $repo = $this->container->get($class);
+            $id = 10000 + $index;
+            self::assertTrue($repo->syncUser($id, 'first', 'First', null));
+            $repo->setLanguage($id, 'fa');
+            self::assertFalse($repo->syncUser($id, 'updated', 'Updated', null));
+            self::assertSame('fa', $repo->getLanguage($id));
+            self::assertSame('updated', $repo->getUser($id)['username']);
+        }
+    }
+
+    public function testCustomQueueTableIsSharedByDispatchAndWorker(): void
+    {
+        $this->config->override('queue.table', 'pending_jobs');
+        $db = $this->container->get(AsyncDatabaseManagerInterface::class);
+        $db->execute('CREATE TABLE pending_jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, queue TEXT, payload TEXT,
+            attempts INTEGER, reserved_at INTEGER, available_at INTEGER, created_at INTEGER)')->await();
+        $queue = $this->container->get(QueueManager::class);
+        $queue->push('ExampleJob', ['value' => 42], 'notifications')->await();
+        $job = $queue->getNextJob('notifications');
+        self::assertNotNull($job);
+        self::assertSame(['job' => 'ExampleJob', 'data' => ['value' => 42]], $job['payload']);
+        $queue->delete($job);
+        self::assertNull($queue->getNextJob('notifications'));
+    }
+
     public function testBothRepositoriesCanBeInjectedAndUsedAtTheSameTime(): void
     {
         $consumer = $this->container->get(DualUserRepositoryConsumer::class);
-        self::assertSame($consumer->async, $this->container->get(UserRepositoryInterface::class));
-        self::assertSame($consumer->async, $this->container->get(UserProviderInterface::class));
+        self::assertInstanceOf(UpdateCachedUserRepository::class, $this->container->get(UserRepositoryInterface::class));
+        self::assertSame($this->container->get(UserRepositoryInterface::class), $this->container->get(UserProviderInterface::class));
         self::assertNotSame($consumer->async, $consumer->eloquent);
         $consumer->async->syncUser(456, null, 'Async', null);
         $consumer->eloquent->setLanguage(456, 'en');
@@ -155,6 +208,14 @@ class UserRepositoryTest extends TestCase
                 }
             };
             $app->getClient()->setHttpClient($transport);
+            $scope = $app->getContainer()->get(\Reactor\Core\UpdateScope::class);
+            $scopeReads = 0;
+            $seen = [];
+            $probe = function () use (&$scopeReads) { return ++$scopeReads; };
+            foreach ([Events::UPDATE_PROCESSING_STARTED, Events::UPDATE_PROCESSING_FINISHED] as $event) {
+                $app->getContainer()->get(EventDispatcher::class)->on($event,
+                    function () use ($scope, $probe, &$seen) { $seen[] = $scope->remember('probe', $probe); });
+            }
             $app->processUpdate(['update_id' => 1, 'message' => [
                 'message_id' => 1, 'from' => ['id' => 999, 'first_name' => 'Bot test'],
                 'chat' => ['id' => 999, 'type' => 'private'], 'text' => '/start',
@@ -166,10 +227,12 @@ class UserRepositoryTest extends TestCase
             ]]);
             $app->getClient()->flush();
             $repo = $app->getContainer()->get(UserRepositoryInterface::class);
-            self::assertInstanceOf(AsyncUserRepository::class, $repo);
+            self::assertInstanceOf(UpdateCachedUserRepository::class, $repo);
             self::assertSame('fa', $repo->getLanguage(999));
             self::assertTrue($repo->getUser(999)['status']);
             self::assertSame(['sendMessage', 'answerCallbackQuery', 'sendMessage'], $transport->methods);
+            self::assertSame([1, 1, 2, 2], $seen, 'Each update gets exactly one independent scope.');
+            self::assertSame(3, $scope->remember('probe', $probe), 'No frame survives processUpdate().');
         } finally {
             foreach ($before as $key => $value) {
                 if ($value === null) {
@@ -179,6 +242,14 @@ class UserRepositoryTest extends TestCase
                 }
             }
         }
+    }
+
+    public function testWebhookModeKeepsTheRawAsyncRepository(): void
+    {
+        $this->config->override('bot.mode', 'webhook');
+        self::assertInstanceOf(AsyncUserRepository::class, $this->container->get(UserRepositoryInterface::class));
+        self::assertSame($this->container->get(UserRepositoryInterface::class),
+            $this->container->get(UserProviderInterface::class));
     }
 
     public function testQueueBindingReceivesItsAsyncDatabaseDependency(): void

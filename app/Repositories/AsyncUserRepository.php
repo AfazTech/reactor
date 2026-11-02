@@ -16,9 +16,31 @@ class AsyncUserRepository implements UserRepositoryInterface, UserProviderInterf
     {
     }
 
-    public function syncUser(int $userId, ?string $username, ?string $firstName, ?string $lastName): void
+    public function syncUser(int $userId, ?string $username, ?string $firstName, ?string $lastName): bool
     {
-        $this->upsert($userId, ['username' => $username, 'first_name' => $firstName, 'last_name' => $lastName]);
+        $values = ['username' => $username, 'first_name' => $firstName, 'last_name' => $lastName];
+        $now = date('Y-m-d H:i:s');
+        $params = ['user_id' => $userId] + $values + ['created_at' => $now, 'updated_at' => $now];
+        $mysql = in_array($this->db->getDriver(), ['mysql', 'mariadb'], true);
+        $sql = 'INSERT INTO users (user_id, username, first_name, last_name, created_at, updated_at)
+                VALUES (:user_id, :username, :first_name, :last_name, :created_at, :updated_at)';
+        if (!$mysql) {
+            $sql .= ' ON CONFLICT (user_id) DO NOTHING';
+        }
+        try {
+            $inserted = $this->db->execute($sql, $params)->await() === 1;
+        } catch (\Amp\Sql\SqlQueryError $e) {
+            // AMPHP MySQL exposes the server code in this message. Only a
+            // duplicate-key failure is recoverable; never hide other errors.
+            if (!$mysql || !str_starts_with($e->getMessage(), 'MySQL error (1062):')) {
+                throw $e;
+            }
+            $inserted = false;
+        }
+        if (!$inserted) {
+            $this->upsert($userId, $values);
+        }
+        return $inserted;
     }
 
     public function getUser(int $userId): ?array

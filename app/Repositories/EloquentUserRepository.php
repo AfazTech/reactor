@@ -30,16 +30,30 @@ class EloquentUserRepository implements UserRepositoryInterface, UserProviderInt
         $this->language = $language;
     }
 
-    public function syncUser(int $userId, ?string $username, ?string $firstName, ?string $lastName): void
+    public function syncUser(int $userId, ?string $username, ?string $firstName, ?string $lastName): bool
     {
-        User::updateOrCreate(
-            ['user_id' => $userId],
-            [
-                'username'   => $username,
-                'first_name' => $firstName,
-                'last_name'  => $lastName,
-            ]
-        );
+        $values = ['username' => $username, 'first_name' => $firstName, 'last_name' => $lastName];
+        $user = User::where('user_id', $userId)->first();
+        if ($user !== null) {
+            $user->fill($values)->save();
+            return false;
+        }
+        try {
+            User::create(['user_id' => $userId] + $values);
+            return true;
+        } catch (\Illuminate\Database\QueryException $e) {
+            $state = $e->errorInfo[0] ?? null;
+            $code = (int) ($e->errorInfo[1] ?? 0);
+            $unique = $state === '23505'
+                || ($state === '23000' && $code === 1062)
+                || ($state === '23000' && $code === 19 && str_contains($e->getMessage(), 'UNIQUE constraint failed: users.user_id'));
+            $user = $unique ? User::where('user_id', $userId)->first() : null;
+            if ($user === null) {
+                throw $e;
+            }
+            $user->fill($values)->save();
+            return false;
+        }
     }
 
     public function getLanguage(int $userId): string

@@ -12,14 +12,14 @@ namespace App\Contracts\Repository;
 interface UserRepositoryInterface
 {
     /**
-     * Create or update a user record.
+     * Create or update a user record. Return true only when this call inserted it.
      *
      * @param int         $userId    Telegram user ID.
      * @param string|null $username  Telegram username.
      * @param string|null $firstName User's first name.
      * @param string|null $lastName  User's last name.
      */
-    public function syncUser(int $userId, ?string $username, ?string $firstName, ?string $lastName): void;
+    public function syncUser(int $userId, ?string $username, ?string $firstName, ?string $lastName): bool;
 
     /**
      * Get the user's preferred language code.

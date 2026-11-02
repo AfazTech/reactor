@@ -84,7 +84,7 @@ public function __construct(
 ```
 
 `UserRepositoryInterface` and the framework's `UserProviderInterface` resolve to
-the same async repository by default. Request `EloquentUserRepository` explicitly
+the same async repository by default (wrapped in an update-local cache in polling mode). Request `EloquentUserRepository` explicitly
 where synchronous ORM access is needed; no environment switch is required.
 Both repositories use the same database and users table. Eloquent models such as
 `App\Models\User` and `DatabaseManagerInterface` remain available for custom
@@ -92,3 +92,20 @@ code, migrations and worker operations. Direct Eloquent queries are synchronous;
 prefer `AsyncDatabaseManagerInterface` for I/O in the polling process.
 
 Run application tests with `composer test` after `composer install`.
+
+
+### Polling update-local user cache
+
+In polling mode, the default interfaces resolve to `UpdateCachedUserRepository`
+wrapping the async repository. Language, step, temporary data and user reads
+share one cached user row in the current update. Successful writes through the
+decorator invalidate that row; the next read reloads it. Missing users are cached
+as null. The cache is isolated per Fiber/update and discarded in `finally`, so
+concurrent updates, nested processing and failures cannot leak state into the
+next update. Outside `processUpdate()` no update cache is retained. Webhook mode
+keeps the raw async binding.
+
+Direct `AsyncUserRepository`, `EloquentUserRepository`, ORM or SQL operations
+bypass the decorator. After a direct write in the same update, call
+`$cachedUsers->forgetUser($userId)` before another cached read. This is a short
+per-update snapshot, not a cross-update or cross-process cache.
