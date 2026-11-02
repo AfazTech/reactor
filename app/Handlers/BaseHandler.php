@@ -102,6 +102,11 @@ abstract class BaseHandler
         return $lang !== '' ? $lang : $this->language->getDefaultLanguage();
     }
 
+    protected function callbackPayload(): array
+    {
+        return $this->update['reactor']['callback_payload'] ?? [];
+    }
+
     protected function getUserId(): ?int
     {
         return $this->fromId($this->update);
