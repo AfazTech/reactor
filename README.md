@@ -30,8 +30,8 @@ It is the fastest way to start a new project and the recommended path for explor
 ## Requirements
 
 - PHP >= 8.4
-- `afaztech/reactor-framework` 0.8.x-dev (current development branch; these changes are not tagged yet)
-- `afaztech/neili` ^4.0
+- `afaztech/reactor-framework` ^0.9.0
+- `afaztech/neili` ^4.0.1
 
 ## Installation
 
@@ -113,7 +113,7 @@ per-update snapshot, not a cross-update or cross-process cache.
 
 ## Bot development features
 
-The development framework includes conversation flows, same-user update ordering,
+Reactor Framework 0.9 includes conversation flows, same-user update ordering,
 `#[Throttle]`, user-bound callback payloads, `FakeTelegram` / `BotTestHarness`,
 queued event listeners and `reactor doctor` / `reactor metrics`. The default
 skeleton installs conversation middleware and async query instrumentation.

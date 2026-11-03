@@ -11,8 +11,8 @@
     "minimum-stability": "stable",
     "prefer-stable": true,
     "require": {
-        "afaztech/reactor-framework": "0.8.x-dev",
-        "afaztech/neili": "^4.0"
+        "afaztech/reactor-framework": "^0.9.0",
+        "afaztech/neili": "^4.0.1"
     },
     "require-dev": {
         "phpunit/phpunit": "^9.6"
